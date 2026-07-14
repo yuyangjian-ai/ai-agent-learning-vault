@@ -1,0 +1,16 @@
+# Obsidian local UI state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache/
+.obsidian/sync.json
+08-学习记录/未命名.base
+
+# Obsidian trash and operating-system files
+.trash/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local tooling metadata
+.agents/
+.codex/
