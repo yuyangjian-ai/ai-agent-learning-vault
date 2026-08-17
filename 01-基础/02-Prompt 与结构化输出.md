@@ -43,6 +43,15 @@ Prompt 是任务契约，不是魔法咒语。一个可维护的 Prompt 应说�
 
 用同一批 20 条工单测试三版 Prompt，统计 schema 通过率、分类正确率和平均耗时。把结论写到 [[99-模板/项目实验模板]]。
 
+> [!example]- 示例答案（假设数据）
+> | 版本 | Schema 通过率 | 分类正确率 | 平均耗时 |
+> | --- | --- | --- | --- |
+> | V1：只给标签 | 80% | 70% | 620 ms |
+> | V2：增加标签定义和 `unknown` | 100% | 85% | 680 ms |
+> | V3：再增加边界示例 | 100% | 90% | 730 ms |
+>
+> V3 质量最好，但应继续扩大样本确认 5% 的提升不是偶然；如果延迟门禁严格，V2 也可以作为候选。
+
 相关：[[01-基础/03-模型 API 与消息协议]] · [[03-工程实践/Context Engineering]]
 
 ## Prompt 的分层
@@ -104,6 +113,13 @@ flowchart LR
     Validate -.失败.-> Repair
 ```
 
+> [!example]- 帮助理解：同一结果怎样经过三层校验
+> - `{priority: high}`：不是合法 JSON，在解析层失败。
+> - `{"priority":"urgent"}`：JSON 合法，但 `urgent` 不在 schema 枚举中。
+> - `{"priority":"high","evidence":[]}`：通过 schema，但“高优先级必须有证据”的业务规则失败。
+>
+> 结构化输出只让错误更容易被发现，并不会自动保证业务正确。
+
 JSON 合法不代表业务合法。例如 `priority: high` 符合 schema，但证据可能不足；`startDate` 和 `endDate` 都是合法日期，但前后关系可能错误。schema 校验之后仍需业务校验。
 
 ## Prompt 版本化
@@ -123,3 +139,8 @@ JSON 合法不代表业务合法。例如 `priority: high` 符合 schema，但�
 - 为“工单分流”定义一个 JSON Schema，至少包含一个 `unknown` 分支。
 - 写一个会产生歧义的坏 Prompt，再把它改写成包含完成标准的任务契约。
 - 设计 5 条边界样本，测试模型是否把不确定信息说成确定事实。
+
+> [!example]- 示例答案（参考）
+> 1. Schema 可以包含 `category: payment | delivery | account | unknown`、`priority: high | normal | unknown`、`evidence: string[]`，并设置 `additionalProperties: false`。
+> 2. 坏 Prompt：“看一下这个工单并处理。”改写后：“只根据工单原文分类；证据不足时类别或优先级输出 `unknown`；返回给定 schema；不得执行退款或修改订单。”
+> 3. 边界样本示例：“好像扣了两次但没查账单”“朋友说包裹可能丢了”“如果明天不到账我要投诉”“页面闪了一下，不确定是否付款”“听说账户被封但我还能登录”。期望模型保留“不确定”语义。

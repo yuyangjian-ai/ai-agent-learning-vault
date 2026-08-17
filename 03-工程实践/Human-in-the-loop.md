@@ -29,6 +29,20 @@ Human-in-the-loop 包含三类能力：
 
 用户确认的是具体 action hash，不是自然语言“可以”。任何参数变化都使旧批准失效。
 
+> [!example]- 帮助理解：用户实际批准的是什么
+> ```yaml
+> action: refund_payment
+> subject: user-17
+> tenant: shop-A
+> resource: payment-P2
+> resourceVersion: 7
+> normalizedArgs: {amount: 88, currency: CNY}
+> evidenceRefs: [payment-query-72, policy-v3-sec4.2]
+> actionHash: sha256:example
+> expiresAt: 2026-08-17T11:00:00+08:00
+> ```
+> 用户看到版本 7 的退款预览并批准；如果执行前资源已变成版本 8，旧 action hash 就不能继续使用。系统应重新查询、生成新预览并再次确认。
+
 ## 暂停与恢复
 
 审批可能几小时后才完成，所以运行状态必须持久化。恢复时重新验证：用户权限是否仍存在、资源版本是否变化、确认是否过期、系统策略是否升级。

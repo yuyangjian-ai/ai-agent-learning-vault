@@ -41,6 +41,27 @@ flowchart LR
 
 Host 管理用户体验、模型和整体权限；每个 Client 与一个 Server 维护协议连接；Server 暴露有限能力。一个 Host 可以连接多个 Server，但不应把不同 Server 的权限上下文混在一起。
 
+> [!example]- 帮助理解：发现工具不等于获得授权
+> ```mermaid
+> sequenceDiagram
+>     participant H as Host
+>     participant C as MCP Client
+>     participant S as MCP Server
+>     participant M as 模型
+>     H->>C: 初始化连接
+>     C->>S: 能力协商 / tools/list
+>     S-->>C: 工具定义
+>     H->>H: 按用户权限筛选可见工具
+>     H->>M: 消息 + 可见工具
+>     M-->>H: 提出 tool call
+>     H->>H: 校验参数 / 必要时确认
+>     H->>C: tools/call
+>     C->>S: 调用并携带受控身份上下文
+>     S-->>C: 鉴权后的结构化结果
+>     H->>M: 回填工具结果
+> ```
+> 模型通常不直接连接 Server。Host 能列出一个工具，只说明“知道它存在”；是否允许本次执行，仍要由 Host 和 Server 分别校验。
+
 ## 两层协议
 
 - **Data layer**：基于 JSON-RPC 的生命周期、能力协商、tools/resources/prompts 和通知。

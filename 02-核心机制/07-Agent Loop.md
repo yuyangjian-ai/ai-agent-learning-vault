@@ -82,6 +82,16 @@ runStep(state):
 
 注意：模型调用和工具调用都不直接修改整个 state，而是产生事件，由状态归并逻辑更新。这让回放与测试更简单。
 
+> [!example]- 帮助理解：一次运行怎样逐步推进
+> | Step | 模型提出的下一步 | Runtime 完成的工作 | State 变化 |
+> | --- | --- | --- | --- |
+> | 0 | — | 创建目标“读取项目版本” | `RUNNING, stepCount=0` |
+> | 1 | `find_files("package.json")` | 校验路径、执行并记录命中 | `stepCount=1`，新增 observation |
+> | 2 | `read_file(...)` | 检查预算、读取有限行数 | `stepCount=2`，更新 token usage |
+> | 3 | 输出最终答案 | 检查无待处理工具或审批 | `COMPLETED` |
+>
+> 模型只是提出每一步；状态转换、预算累计和完成确认始终由 Runtime 执行。
+
 ## Budget 是多维的
 
 除了最大步数，还要控制：输入/输出 token、总费用、工具调用次数、并发量、外部 API 配额和总墙钟时间。一个便宜的无限循环仍然会占用资源并影响用户体验。
@@ -108,3 +118,17 @@ runStep(state):
 ## 章节练习
 
 画出 Mini Agent CLI 的状态机，并为“文件不存在”“用户取消”“shell 等待审批”“达到最大步数”分别写出终止或恢复路径。
+
+> [!example]- 示例答案（参考）
+> ```text
+> RUNNING -> WAITING_FOR_TOOL -> RUNNING -> COMPLETED
+>    |              |              |
+>    v              v              v
+> CANCELLED      NEEDS_INPUT   BUDGET_EXCEEDED
+>    |
+> WAITING_FOR_APPROVAL -> RUNNING / CANCELLED
+> ```
+> - 文件不存在：工具返回 `NOT_FOUND`；有候选路径则允许一次修正，否则进入 `NEEDS_INPUT`。
+> - 用户取消：写入取消事件，传播 cancel signal，最终进入 `CANCELLED`。
+> - Shell 等待审批：保存真实参数和 action hash，进入 `WAITING_FOR_APPROVAL`；批准后重新校验再执行。
+> - 达到最大步数：保存当前观察和未完成原因，进入 `BUDGET_EXCEEDED`，不再调用模型。

@@ -66,6 +66,16 @@ Checkpoint 不能自动解决副作用幂等。节点恢复后是否重跑、外
 
 实现一个三节点图：分类问题 → 只读查询 → 生成回答。再加入：查询失败重试一次、敏感查询 interrupt、checkpoint 后恢复。用同一 thread ID 验证状态是否连续。
 
+> [!example]- 示例答案（伪代码）
+> ```text
+> classify -> normal: query -> answer -> END
+>          -> sensitive: interrupt -> approved: query
+>                                -> rejected: END
+> query -> retryable_error: retry_query(max=1)
+>       -> permanent_error: answer_with_failure
+> ```
+> State 至少包含 `threadId/category/queryResult/retryCount/pendingApproval/status`。恢复测试中，interrupt 前后使用同一 thread ID，确认 `retryCount` 和分类结果没有丢失；查询工具仍应使用幂等或只读语义，不能把 checkpoint 当作副作用保障。
+
 ## 官方资料
 
 - [LangGraph Overview](https://docs.langchain.com/oss/python/langgraph/overview)

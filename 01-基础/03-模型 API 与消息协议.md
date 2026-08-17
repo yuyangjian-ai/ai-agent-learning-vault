@@ -52,6 +52,24 @@ assistant:        根据工具结果形成回答
 
 工具结果不是新的用户指令，而是一次外部观察。Runtime 必须把 `tool_call_id` 与工具结果对应起来，避免并行调用时串错结果。
 
+> [!example]- 帮助理解：一次 Tool Call 实际跨越两次模型请求
+> ```text
+> Request 1 messages:
+>   user: 查询订单 A123
+>
+> Response 1:
+>   assistant: tool_call(id=tc_1, name=get_order_status, args={A123})
+>
+> Runtime 执行工具后，Request 2 messages:
+>   user: 查询订单 A123
+>   assistant: tool_call(id=tc_1, ...)
+>   tool: tool_call_id=tc_1, result={status: shipped}
+>
+> Response 2:
+>   assistant: 订单 A123 当前已发货……
+> ```
+> 工具通常由应用在两次模型请求之间执行。第二次请求既要带回模型原先的调用记录，也要带回 ID 匹配的工具结果。
+
 ## 流式响应
 
 流式传输改善首 token 延迟，但给工程带来额外状态：连接可能中途断开、结构化 JSON 在完成前不合法、工具调用参数可能分片到达、用户可能主动取消。
@@ -105,3 +123,11 @@ assistant:        根据工具结果形成回答
 ## 实验任务
 
 为同一个调用模拟限流、超时、JSON 截断和客户端取消，检查系统返回的错误类型、重试次数和 trace 是否符合预期。
+
+> [!example]- 示例答案（参考）
+> | 场景 | 对外错误 | 重试 | Trace 关键字段 |
+> | --- | --- | --- | --- |
+> | 首次 429，随后成功 | 无；最终成功 | 1 次退避 | `attempts=2`、429、等待时间 |
+> | 超过 total deadline | `MODEL_TIMEOUT` | 0 或服从剩余预算 | deadline、已耗时、取消结果 |
+> | JSON 被截断 | `INVALID_MODEL_OUTPUT` | 最多 1 次结构修复 | finish reason、schema 版本 |
+> | 客户端取消 | `CANCELLED` | 0 次 | cancel source、供应商请求是否终止 |

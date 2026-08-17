@@ -129,3 +129,12 @@ flowchart LR
 ## 练习
 
 把“发送邮件”设计成 `draft_email`、`preview_email`、`send_email` 三个阶段，写出每一步的输入、返回、权限与审计字段。
+
+> [!example]- 示例答案（参考）
+> | 工具 | 模型提供 | Runtime 注入 | 返回 | 权限/审计 |
+> | --- | --- | --- | --- | --- |
+> | `draft_email` | 收件人候选、主题、正文意图 | 用户、租户 | 草稿 ID、内容 | 只生成；记录 Prompt/模型版本 |
+> | `preview_email` | 草稿 ID | 当前用户、可见范围 | 最终收件人、正文、风险提示、action hash | 校验地址和附件权限 |
+> | `send_email` | 确认令牌 | 用户、run ID、幂等键 | message ID、发送时间 | 要求 `email:send`；记录审批人与 action hash |
+>
+> 确认令牌必须绑定预览内容并设置过期时间；发送超时后先按幂等键查询结果，不能直接重发。

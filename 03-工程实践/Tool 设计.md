@@ -113,3 +113,11 @@ Then 工具返回 FORBIDDEN，且响应不泄露订单是否存在
 ## 练习
 
 为“查询库存并创建补货单”设计工具集。明确哪些字段由模型提供、哪些由执行上下文注入、如何确认、如何避免重复创建。
+
+> [!example]- 示例答案（参考）
+> - `search_inventory(skuOrName)`：只读搜索，返回 SKU 候选。
+> - `get_inventory(sku, warehouseId)`：只读，返回现存量、在途量、数据版本和观察时间。
+> - `prepare_replenishment(sku, warehouseId, quantity, expectedVersion)`：生成供应商、数量、预计金额和 action hash，不写入。
+> - `confirm_replenishment(confirmToken)`：创建补货单并返回 order ID。
+>
+> 模型只提供 SKU 候选、仓库和建议数量；Runtime 注入用户、租户、scope、run ID、deadline 和幂等键。确认令牌绑定预览参数；相同业务意图使用相同幂等键，超时后先查询创建结果。
