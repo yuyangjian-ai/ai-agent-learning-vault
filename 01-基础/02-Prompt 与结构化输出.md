@@ -6,6 +6,10 @@ status: seed
 
 # Prompt 与结构化输出
 
+> [!tip] 阅读方式
+> **学完能做什么**：把“帮我看一下工单”改成有输入边界、输出字段和失败处理的任务。
+> **前置**：[[01-基础/01-LLM 基础]]。第一遍完成“工单分类契约”和“小实验”；接入项目时再读分层、版本化与调试。
+
 ## Prompt 的职责
 
 Prompt 是任务契约，不是魔法咒语。一个可维护的 Prompt 应说明：角色与目标、可用上下文、约束、输出格式、失败时的行为。
@@ -31,6 +35,39 @@ Prompt 是任务契约，不是魔法咒语。一个可维护的 Prompt 应说�
 }
 ```
 
+## 工单分类契约
+
+后续工单分类示例统一使用以下教学契约，版本名为 `ticket-classification-v1`。版本记录在实验 manifest 和运行记录中，不要求模型自己生成版本号。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "category": {"type": "string", "enum": ["payment", "delivery", "account", "policy", "unknown"]},
+    "priority": {"type": "string", "enum": ["high", "normal", "unknown"]},
+    "evidence": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": ["category", "priority", "evidence"],
+  "additionalProperties": false
+}
+```
+
+| 字段/标签 | 约定 | 简单例子 |
+| --- | --- | --- |
+| `payment` | 具体扣款、支付或退款状态问题 | “同一订单扣了两次款” |
+| `delivery` | 订单配送或状态查询 | “订单什么时候发货” |
+| `account` | 登录、账户访问问题 | “无法登录账户” |
+| `policy` | 咨询一般规则，尚不要求判断某笔交易 | “退款政策要求什么材料” |
+| `unknown` 类别 | 信息不足或超出这些类别 | “帮我看看” |
+| `high / normal / unknown` | 具体资金风险或严重使用阻断 / 明确的一般咨询 / 影响程度不明 | “重复扣款未退” / “查询发货日期” / “页面好像有问题” |
+| `evidence` | 支持分类或优先级的原文连续片段；没有证据时为 `[]` | `["同一订单扣了两次款"]` |
+
+如果同时涉及多类，选择用户主要诉求；无法确定主要诉求时返回 `unknown`。`high` 必须有原文风险或影响证据；“疑似重复扣款”可以触发人工优先核查，但不能证明实际扣了两次。程序另外检查证据是否真的出现在输入中、是否支持结论。
+
+这份契约只做分流。`orderId`、金额、审批参数需要独立的抽取或工具契约，不能临时塞进分类结果。真实业务可以调整标签与优先级规则，但应升级版本并重新评测。
+
+对后端开发者来说，JSON Schema 类似接口入参契约，但 TypeScript 的类型声明或 Java 的 DTO 不会自动保证模型的原始输出合法。必须实际执行解析、字段校验和业务校验；对应短例子见 [[03-工程实践/TypeScript 与 Java 实现对照]]。
+
 ## 稳定性策略
 
 - 字段用枚举和明确类型，不要让一个字段承担多个语义。
@@ -46,13 +83,11 @@ Prompt 是任务契约，不是魔法咒语。一个可维护的 Prompt 应说�
 > [!example]- 示例答案（假设数据）
 > | 版本 | Schema 通过率 | 分类正确率 | 平均耗时 |
 > | --- | --- | --- | --- |
-> | V1：只给标签 | 80% | 70% | 620 ms |
-> | V2：增加标签定义和 `unknown` | 100% | 85% | 680 ms |
-> | V3：再增加边界示例 | 100% | 90% | 730 ms |
+> | V1：只给标签 | 16/20（80%） | 14/20（70%） | 620 ms |
+> | V2：增加标签定义和 `unknown` | 20/20（100%） | 17/20（85%） | 680 ms |
+> | V3：再增加边界示例 | 20/20（100%） | 18/20（90%） | 730 ms |
 >
-> V3 质量最好，但应继续扩大样本确认 5% 的提升不是偶然；如果延迟门禁严格，V2 也可以作为候选。
-
-相关：[[01-基础/03-模型 API 与消息协议]] · [[03-工程实践/Context Engineering]]
+> 两种比例都以全部 20 条为分母；格式错误也算分类失败。V3 比 V2 多答对 1 条，即高 5 个百分点；应扩大独立留出样本确认收益，不能把这 20 条调试样本的结果当成泛化能力证明。
 
 ## Prompt 的分层
 
@@ -95,17 +130,19 @@ Prompt 说明总体策略，具体工具的使用边界写进工具描述；权�
 
 ```text
 输入：客户说“可能重复扣款，但我还没查账单”
-输出：{"category":"payment","priority":"unknown","evidence":["可能重复扣款","还没查账单"]}
+输出：{"category":"payment","priority":"high","evidence":["可能重复扣款","还没查账单"]}
 ```
 
-这个例子同时告诉模型：不要把“可能”升级为已确认事实。
+`high` 表示资金风险需要优先核查，不表示重复扣款已经证实。就像“疑似火情优先排查”不等于“已经确认起火”。优先级与事实确定程度是两个维度；工具没核实前，回复仍要保留“疑似”。若只是“页面好像有问题”，缺少具体风险或影响证据，优先级才用 `unknown`。
 
 ## 结构化输出的完整处理链
 
 ```mermaid
 flowchart LR
     Prompt["Prompt + Schema"] --> Model["模型"]
-    Model --> Parse["JSON 解析"]
+    Model --> Status{"完整且非拒答？"}
+    Status -->|是| Parse["JSON 解析"]
+    Status -->|否| Stop["拒答 / 未完成 / 错误分支"]
     Parse --> Validate["Schema 校验"]
     Validate --> Business["业务规则校验"]
     Business --> Use["进入后续流程"]
@@ -115,8 +152,8 @@ flowchart LR
 
 > [!example]- 帮助理解：同一结果怎样经过三层校验
 > - `{priority: high}`：不是合法 JSON，在解析层失败。
-> - `{"priority":"urgent"}`：JSON 合法，但 `urgent` 不在 schema 枚举中。
-> - `{"priority":"high","evidence":[]}`：通过 schema，但“高优先级必须有证据”的业务规则失败。
+> - `{"category":"payment","priority":"urgent","evidence":[]}`：JSON 合法，但 `urgent` 不在 schema 枚举中。
+> - `{"category":"payment","priority":"high","evidence":[]}`：通过 schema，但“高优先级必须有证据”的业务规则失败。
 >
 > 结构化输出只让错误更容易被发现，并不会自动保证业务正确。
 
@@ -141,6 +178,8 @@ JSON 合法不代表业务合法。例如 `priority: high` 符合 schema，但�
 - 设计 5 条边界样本，测试模型是否把不确定信息说成确定事实。
 
 > [!example]- 示例答案（参考）
-> 1. Schema 可以包含 `category: payment | delivery | account | unknown`、`priority: high | normal | unknown`、`evidence: string[]`，并设置 `additionalProperties: false`。
+> 1. 可直接采用本章“工单分类契约”的三个必填字段和枚举；再增加业务校验，确保 `high` 有原文证据，而不是仅看 JSON 能否解析。
 > 2. 坏 Prompt：“看一下这个工单并处理。”改写后：“只根据工单原文分类；证据不足时类别或优先级输出 `unknown`；返回给定 schema；不得执行退款或修改订单。”
 > 3. 边界样本示例：“好像扣了两次但没查账单”“朋友说包裹可能丢了”“如果明天不到账我要投诉”“页面闪了一下，不确定是否付款”“听说账户被封但我还能登录”。期望模型保留“不确定”语义。
+
+下一篇：[[01-基础/03-模型 API 与消息协议]] · 工程延伸：[[03-工程实践/Context Engineering]]

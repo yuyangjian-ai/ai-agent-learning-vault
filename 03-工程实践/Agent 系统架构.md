@@ -15,7 +15,7 @@ flowchart TB
     Runtime --> Registry["Tool Registry"]
     Runtime --> State["State Store"]
     Registry --> Policy["Policy / Approval"]
-    Registry --> Systems["External Systems"]
+    Policy --> Systems["External Systems"]
     Runtime --> Trace["Trace / Metrics / Audit"]
     Eval["Evaluation"] --> Trace
 ```
@@ -27,7 +27,7 @@ flowchart TB
 - **Context Builder**：选择指令、记忆、检索结果和工具结果。
 - **Tool Registry**：注册 schema、执行器、权限和超时策略。
 - **State Store**：保存 run/session 状态，不把模型消息当唯一数据库。
-- **Policy/Approval**：在执行高风险动作前独立授权。
+- **Policy/Approval**：每次动作都校验权限，高风险动作还要取得对应批准。
 - **Trace/Eval**：让每次决策可观察、可回放、可比较。
 
 ## 关键原则
@@ -51,6 +51,21 @@ flowchart TB
 7. 工具执行或进入人工审批。
 8. 观察结果以事件形式写入，再推进下一步。
 9. 完成后生成最终结果、引用、运行摘要和审计记录。
+
+> [!example]- 帮助理解：一句“没发货就帮我取消”为什么会经过多层
+> | 阶段 | 示例产物 | 这一层解决的问题 |
+> | --- | --- | --- |
+> | API | `user=u17, tenant=t1, orderInput=A123` | 谁在请求；订单号此时只是待验证输入 |
+> | Runtime | `RunCreated(run-9), budget=6 steps` | 任务如何开始、何时必须停 |
+> | Policy | 只开放 `get_order` 和 `prepare_cancel` | 本次最多允许做什么 |
+> | Model | 提出 `get_order(A123)` | 根据目标选择下一步 |
+> | Tool | `status=PAID, shipped=false, version=8` | 从源系统取得当前事实 |
+> | Validator | 允许准备取消，但禁止直接写入 | 决定是否满足业务前置条件 |
+> | Approval | 展示订单、原因和 action hash | 用户具体批准哪次变更 |
+> | Executor | 使用确认令牌和幂等键执行取消 | 同一逻辑动作不重复生效，超时后可查结果 |
+> | State Store | 保存读取、批准和执行事件 | 崩溃后从哪里恢复、如何审计 |
+>
+> 模型可以提出“取消”，但不能替代身份解析、权限、订单事实、确认和幂等。把这些责任分层，不是为了增加组件，而是为了让每个关键决定都有唯一、可测试的负责人。
 
 ## 建议的数据模型
 
@@ -83,7 +98,7 @@ Approval
 | 队列 + Worker | 长任务、批处理、并发控制 | 状态持久化、取消、幂等 |
 | Workflow Engine | 长事务、审批、定时等待 | 与 Agent state 的边界 |
 
-“模型在思考”不是可靠的进度。UI 应展示结构化事件：正在检索、等待审批、工具完成、正在验证等。
+“模型在思考”不是可靠的进度。UI 应展示结构化事件：正在检索、等待审批、工具完成、正在验证等。异步受理、回调和取消竞态见 [[03-工程实践/异步任务与取消]]。
 
 ## 控制面与数据面
 
@@ -114,4 +129,4 @@ Approval
 > 4. 旧 run 绑定原 prompt/toolset 版本恢复；若旧版本不可用或 schema 不兼容，则进入迁移或人工处理，不能静默切换。
 > 5. 最终结论保存 `sourceRef`，动作保存 step、tool call、审批和结果事件；如果任一关键事实没有引用，应视为评审未通过。
 
-专题：[[03-工程实践/状态、事件与持久化]] · [[03-工程实践/错误恢复与幂等]] · [[03-工程实践/Human-in-the-loop]] · [[03-工程实践/模型网关与路由]]
+专题：[[03-工程实践/状态、事件与持久化]] · [[03-工程实践/错误恢复与幂等]] · [[03-工程实践/Human-in-the-loop]] · [[03-工程实践/模型网关与路由]] · [[03-工程实践/身份、凭据与委托授权]]

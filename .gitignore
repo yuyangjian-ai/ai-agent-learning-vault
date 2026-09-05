@@ -14,3 +14,13 @@ desktop.ini
 # Local tooling metadata
 .agents/
 .codex/
+.idea/
+
+# Local Python lab and validation caches
+__pycache__/
+*.py[cod]
+.venv/
+
+# Generated TypeScript lab dependencies and build output
+/labs/**/node_modules/
+/labs/**/dist/

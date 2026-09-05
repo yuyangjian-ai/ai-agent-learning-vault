@@ -1,0 +1,60 @@
+name: Validate tutorial
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-maintenance:
+    # Python runs repository maintenance tools and the optional reference lab.
+    # It is not a prerequisite for the default TypeScript learning path.
+    name: Documentation maintenance and optional Python reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+      - name: Test documentation validator
+        run: python -m unittest discover -s scripts/tests -v
+      - name: Check local documentation
+        run: python scripts/check_docs.py
+      - name: Test optional Python reference
+        run: python -m unittest discover -s labs/01-agent-runtime/tests -v
+      - name: Evaluate optional Python reference
+        run: python labs/01-agent-runtime/main.py --evaluate
+
+  typescript-lab:
+    name: TypeScript Agent Runtime (${{ matrix.os }}, Node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: "22"
+          - os: windows-latest
+            node: "24"
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: labs/01-agent-runtime/typescript
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - name: Install locked development dependencies
+        run: npm ci --ignore-scripts
+      - name: Test TypeScript Agent Runtime
+        run: npm test
+      - name: Evaluate fixed synthetic cases
+        run: npm run evaluate

@@ -1,0 +1,7 @@
+{
+  "ORD-001": {"tenant_id": "tenant-a", "status": "待发货", "updated_at": "2026-09-01T08:00:00Z"},
+  "ORD-002": {"tenant_id": "tenant-a", "status": "运输中", "updated_at": "2026-09-01T09:00:00Z"},
+  "ORD-003": {"tenant_id": "tenant-a", "status": "已送达", "updated_at": "2026-09-01T10:00:00Z"},
+  "ORD-004": {"tenant_id": "tenant-b", "status": "已取消", "updated_at": "2026-09-01T11:00:00Z"},
+  "ORD-900": {"tenant_id": "tenant-b", "status": "待付款", "updated_at": "2026-09-01T12:00:00Z"}
+}

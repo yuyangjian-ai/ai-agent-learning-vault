@@ -8,6 +8,8 @@ status: seed
 
 LangGraph 的核心思路是把 Agent 表达成“状态 + 节点 + 边”的图。节点执行模型或工具，边决定下一步，检查点用于暂停、恢复和人工介入。
 
+本教程优先链接 JavaScript/TypeScript 版本，Node.js 开发者不需要转学 Python。先手写 [[labs/01-agent-runtime/README|TypeScript 离线循环]]，再看框架怎样接管节点调度；Java 项目可以继续用业务 Workflow 或按需评估 [[04-框架与生态/Spring AI 能力边界]]，无需强行统一语言。
+
 ## 适合场景
 
 - 多步流程有循环和条件分支。
@@ -50,6 +52,14 @@ flowchart LR
 
 Checkpoint 不能自动解决副作用幂等。节点恢复后是否重跑、外部写操作是否已发生，仍需要 [[03-工程实践/错误恢复与幂等]] 中的业务设计。
 
+> [!example]- 帮助理解：有 checkpoint，为什么仍可能重复扣款
+> 1. 图在“准备扣款”后保存 checkpoint。
+> 2. 扣款节点调用支付系统，支付成功。
+> 3. 进程在写入下一个 checkpoint 前崩溃。
+> 4. 恢复后，图只看得到“准备扣款”的旧状态，可能再次执行扣款节点。
+>
+> Checkpoint 解决的是“图从哪个状态继续”，不是“外部世界是否已经发生副作用”。正确做法是为这次逻辑扣款生成幂等键，并在重试和恢复中稳定复用；支付系统还应把它与调用主体及规范化业务参数绑定。恢复时先查询该键对应的执行结果，再决定复用结果还是重试。
+
 ## Graph 设计原则
 
 - 节点尽量小而有明确输入输出，但不要把每行代码都拆成节点。
@@ -57,6 +67,7 @@ Checkpoint 不能自动解决副作用幂等。节点恢复后是否重跑、外
 - 条件边返回有限枚举，避免自由文本路由。
 - 写节点应幂等，或在执行前后记录动作状态。
 - Interrupt 前持久化真实待审参数，恢复时重新校验。
+- `interrupt()` 恢复时会从当前节点开头重新执行；放在 interrupt 之前的副作用必须幂等。同一节点有多个 interrupt 时，每次重执行的数量与顺序必须稳定，因为恢复值按位置匹配。
 
 ## 与 LangChain 的关系
 
@@ -74,12 +85,13 @@ Checkpoint 不能自动解决副作用幂等。节点恢复后是否重跑、外
 > query -> retryable_error: retry_query(max=1)
 >       -> permanent_error: answer_with_failure
 > ```
-> State 至少包含 `threadId/category/queryResult/retryCount/pendingApproval/status`。恢复测试中，interrupt 前后使用同一 thread ID，确认 `retryCount` 和分类结果没有丢失；查询工具仍应使用幂等或只读语义，不能把 checkpoint 当作副作用保障。
+> State 至少包含 `category/queryResult/retryCount/pendingApproval/status`；thread ID 放在 checkpointer 的运行配置中，避免出现两个真相源。恢复测试中，interrupt 前后使用同一 thread ID，确认 `retryCount` 和分类结果没有丢失；查询工具仍应使用幂等或只读语义，不能把 checkpoint 当作副作用保障。
 
 ## 官方资料
 
-- [LangGraph Overview](https://docs.langchain.com/oss/python/langgraph/overview)
-- [Graph API](https://docs.langchain.com/oss/python/langgraph/graph-api)
-- [Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
+- [LangGraph JavaScript/TypeScript Overview](https://docs.langchain.com/oss/javascript/langgraph/overview)
+- [Graph API](https://docs.langchain.com/oss/javascript/langgraph/graph-api)
+- [Persistence](https://docs.langchain.com/oss/javascript/langgraph/persistence)
+- [Interrupts](https://docs.langchain.com/oss/javascript/langgraph/interrupts)
 
-资料核对日期：2026-07-14。
+JavaScript/TypeScript 资料及 interrupt 恢复语义核对日期：2026-09-05。

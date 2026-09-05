@@ -1,0 +1,14 @@
+[
+  {"id": "success-pending", "scenario": "success", "tenant_id": "tenant-a", "order_id": "ORD-001", "expected": {"status": "completed", "tool_attempts": 1, "response_contains": "待发货"}},
+  {"id": "success-shipping", "scenario": "success", "tenant_id": "tenant-a", "order_id": "ORD-002", "expected": {"status": "completed", "tool_attempts": 1, "response_contains": "运输中"}},
+  {"id": "success-delivered", "scenario": "success", "tenant_id": "tenant-a", "order_id": "ORD-003", "expected": {"status": "completed", "tool_attempts": 1, "response_contains": "已送达"}},
+  {"id": "success-tenant-b", "scenario": "success", "tenant_id": "tenant-b", "order_id": "ORD-004", "expected": {"status": "completed", "tool_attempts": 1, "response_contains": "已取消"}},
+  {"id": "schema-extra-key", "scenario": "schema_error", "tenant_id": "tenant-a", "order_id": "ORD-001", "expected": {"status": "schema_error", "tool_attempts": 0, "response_contains": "只能包含 order_id"}},
+  {"id": "schema-wrong-type", "scenario": "schema_error", "schema_variant": "wrong_type", "tenant_id": "tenant-a", "order_id": "ORD-001", "expected": {"status": "schema_error", "tool_attempts": 0, "response_contains": "字符串"}},
+  {"id": "deny-other-tenant", "scenario": "unauthorized", "tenant_id": "tenant-a", "order_id": "ORD-900", "expected": {"status": "denied", "tool_attempts": 0, "response_contains": "不存在或当前租户无权访问"}},
+  {"id": "deny-missing-order", "scenario": "unauthorized", "tenant_id": "tenant-a", "order_id": "ORD-999", "expected": {"status": "denied", "tool_attempts": 0, "response_contains": "不存在或当前租户无权访问"}},
+  {"id": "tool-timeout", "scenario": "timeout", "tenant_id": "tenant-a", "order_id": "ORD-001", "simulated_tool_latency_ms": 250, "tool_timeout_ms": 100, "expected": {"status": "timeout", "tool_attempts": 1, "response_contains": "尚未获得订单结果"}},
+  {"id": "repeated-tool-loop", "scenario": "loop_limit", "tenant_id": "tenant-a", "order_id": "ORD-001", "max_model_calls": 3, "expected": {"status": "step_limit", "tool_attempts": 3, "response_contains": "上限"}},
+  {"id": "cancel-before-tool", "scenario": "cancelled", "tenant_id": "tenant-a", "order_id": "ORD-001", "cancel_after_model_calls": 1, "expected": {"status": "cancelled", "tool_attempts": 0, "response_contains": "未执行后续动作"}},
+  {"id": "budget-before-final", "scenario": "budget_limit", "tenant_id": "tenant-a", "order_id": "ORD-001", "max_simulated_tokens": 30, "expected": {"status": "budget_limit", "tool_attempts": 1, "response_contains": "预算不足"}}
+]

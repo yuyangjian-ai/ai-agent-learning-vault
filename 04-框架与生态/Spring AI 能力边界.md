@@ -6,6 +6,9 @@ status: seed
 
 # Spring AI 能力边界
 
+> [!info] 版本范围
+> 本文按 Spring AI `2.0.1` 核对；官方当前也将 `1.1.8` 列为 stable。两个分支的 Tool Calling 循环位置不同，复制示例前先确认项目锁定版本。
+
 ## 适合覆盖的能力
 
 - 模型客户端与 Prompt 模板
@@ -73,7 +76,15 @@ String answer = chatClient.prompt()
     .content();
 ```
 
-当前官方参考中，`ChatClient` 可以由框架控制工具循环，也提供 Advisor 控制或用户手动控制的方式。需要自定义审批、状态机和中间进度时，不应只依赖默认自动循环。
+在 `2.0.1` 中，`DefaultChatClient` 会自动注册 `ToolCallingAdvisor` 来驱动工具循环；直接使用 `ChatModel.call()` 或 `stream()` 则只返回包含 tool call 的原始响应，需要应用自己检查并继续循环。需要自定义审批、状态机和中间进度时，不应只依赖默认自动循环。
+
+| 调用方式 | 2.0.x 的默认行为 | 适合场景 |
+| --- | --- | --- |
+| `ChatClient` + tools | `ToolCallingAdvisor` 自动执行循环 | 简单、低风险工具调用 |
+| 为 `ChatClient` 提供自定义 `ToolAdvisor` | 使用该 Advisor 控制工具循环，避免重复注册 | 自定义循环策略 |
+| 直接调用 `ChatModel`，或关闭自动注册 | 不自动执行工具 | 应用手动决定执行、暂停和恢复 |
+
+`1.x` 的部分 `ChatModel` 曾内置工具循环；升级到 `2.0.x` 时不能假设行为不变。
 
 > [!example]- 帮助理解：`@Tool` 只解决了一部分工作
 > 以“取消订单”为例：
@@ -124,5 +135,6 @@ Spring AI 基于 Spring 生态的观测能力记录模型和工具相关 observa
 - [Retrieval Augmented Generation](https://docs.spring.io/spring-ai/reference/api/retrieval-augmented-generation.html)
 - [Chat Memory](https://docs.spring.io/spring-ai/reference/api/chat-memory.html)
 - [Observability](https://docs.spring.io/spring-ai/reference/observability/index.html)
+- [Upgrade Notes](https://docs.spring.io/spring-ai/reference/upgrade-notes.html)
 
-资料核对日期：2026-07-14。
+资料核对日期：2026-09-04；示例基线：Spring AI `2.0.1`。

@@ -6,6 +6,9 @@ status: seed
 
 # Agent Loop
 
+> [!abstract] 本章读完能做什么
+> 能手工跟踪一次“提出动作 → 校验 → 执行 → 回填”的循环，并说清它何时等待、何时停止。先读 [[02-核心机制/04-Tool Calling]]；也可以先跑 [离线 Runtime 实验](../labs/01-agent-runtime/README.md)，对照输出理解每一步。
+
 ## Agent 的最小运行循环
 
 ```text
@@ -37,8 +40,6 @@ LLM 负责提出下一步，Runtime 负责执行、限制和记录。把所有�
 
 `goal`、`messages`、`stepCount`、`observations`、`pendingApproval`、`budget`、`finalStatus`。
 
-实践：[[05-项目实战/02-Mini Agent CLI]] ；进一步学习：[[02-核心机制/08-Planning 与 Reflection]]
-
 ## 从 while 循环到显式状态机
 
 简单循环适合学习，生产系统更适合显式状态机：
@@ -65,22 +66,41 @@ stateDiagram-v2
 ```text
 runStep(state):
     assert state.status == RUNNING
-    assert state.stepCount < limits.maxSteps
+    if cancelled(state): return cancelRun(state)
+    if limitsReached(state): return stopWithBudgetReason(state)
     context = contextBuilder.build(state)
     decision = model.generate(context, visibleTools)
+    state = recordModelUsageAndIncrementStep(state, decision)
+    if cancelled(state): return cancelRun(state)
+    if deadlineExpired(state): return stopWithDeadlineReason(state)
     validated = decisionValidator.validate(decision, state)
 
+    if validated.type == INVALID:
+        return boundedRepairOrFail(state, validated.errors)
+    if validated.type == REFUSAL:
+        return refuse(state, validated.reason)
+    if validated.type == NEED_INPUT:
+        return pauseForInput(state, validated.question)
     if validated.type == FINAL:
-        return complete(state, validated.output)
+        return verifyCompletionOrFail(state, validated.output)
 
-    if policy.requiresApproval(validated):
+    # 余下必须是已注册工具的 TOOL_CALL，绝不执行任意输出。
+    assert validated.type == TOOL_CALL
+    permission = policy.authorize(authContext, validated, state)
+    if permission == DENY: return recordDeniedAction(state, validated)
+    if permission == REQUIRE_APPROVAL:
         return pauseForApproval(state, validated)
 
+    # 模型调用期间可能已经超时、耗尽预算或收到取消。
+    if cancelled(state): return cancelRun(state)
+    if limitsReached(state): return stopWithBudgetReason(state)
     result = toolExecutor.execute(validated, deadline, idempotencyKey)
     return appendObservation(state, validated, result)
 ```
 
-注意：模型调用和工具调用都不直接修改整个 state，而是产生事件，由状态归并逻辑更新。这让回放与测试更简单。
+这是讲解控制分支的伪代码，不是某个 SDK 的接口。图中的 `Running/NeedsInput` 与代码里的 `RUNNING/NEED_INPUT` 是不同命名风格，项目内应统一。正式实现中，模型和工具返回结果，再由 Runtime 记录事件、更新状态；工具的真实外部副作用则需要另外核对。预算需要调用前预留上限、调用后结算，不能只在产生费用后才检查。
+
+审批通过不是永久授权：恢复时应验证批准绑定的参数、资源版本和有效期，再重新鉴权。`FINAL` 也只是候选结果；还要检查必需任务是否完成、是否仍有待处理的工具或审批，才能把 run 标为完成。
 
 > [!example]- 帮助理解：一次运行怎样逐步推进
 > | Step | 模型提出的下一步 | Runtime 完成的工作 | State 变化 |
@@ -122,13 +142,14 @@ runStep(state):
 > [!example]- 示例答案（参考）
 > ```text
 > RUNNING -> WAITING_FOR_TOOL -> RUNNING -> COMPLETED
->    |              |              |
->    v              v              v
-> CANCELLED      NEEDS_INPUT   BUDGET_EXCEEDED
->    |
-> WAITING_FOR_APPROVAL -> RUNNING / CANCELLED
+> RUNNING -> NEEDS_INPUT -> RUNNING
+> RUNNING -> WAITING_FOR_APPROVAL -> RUNNING / CANCELLED
+> RUNNING -> CANCELLED
+> RUNNING -> BUDGET_EXCEEDED
 > ```
 > - 文件不存在：工具返回 `NOT_FOUND`；有候选路径则允许一次修正，否则进入 `NEEDS_INPUT`。
 > - 用户取消：写入取消事件，传播 cancel signal，最终进入 `CANCELLED`。
 > - Shell 等待审批：保存真实参数和 action hash，进入 `WAITING_FOR_APPROVAL`；批准后重新校验再执行。
 > - 达到最大步数：保存当前观察和未完成原因，进入 `BUDGET_EXCEEDED`，不再调用模型。
+
+下一步：[[05-项目实战/02-Mini Agent CLI]] · [[03-工程实践/异步任务与取消]] · [[02-核心机制/08-Planning 与 Reflection]]

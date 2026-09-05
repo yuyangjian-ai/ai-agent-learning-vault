@@ -1,0 +1,20 @@
+{
+  "name": "agent-runtime-teaching-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "prestart": "npm run build",
+    "start": "node dist/src/main.js",
+    "preevaluate": "npm run build",
+    "evaluate": "node dist/src/main.js --evaluate",
+    "test": "npm run build && node --test dist/tests/runtime.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "7.0.2"
+  }
+}
