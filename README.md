@@ -2,16 +2,18 @@
 
 一套面向开发者的中文 AI Agent 系统学习教程，采用 Obsidian Markdown 组织。
 
-内容从 LLM、Prompt 和模型 API 开始，逐步覆盖 Tool Calling、RAG、Memory、Agent Loop、Planning、Multi-Agent、Context Engineering、MCP、评测、安全和生产化。默认实战采用 **Node.js + TypeScript**，配套 **Java/Spring** 实现对照；不需要先学 Python 或机器学习数学。
+内容从 LLM、Prompt 和模型 API 开始，逐步覆盖 Tool Calling、RAG、Memory、LLM Wiki、Agent Loop、Planning、Multi-Agent、Context Engineering、MCP、评测、安全和生产化。默认实战采用 **Node.js + TypeScript**，配套 **Java/Spring** 实现对照；不需要先学 Python 或机器学习数学。
 
 ## 开始学习
 
+- [10 分钟 Quick Start](00-首页/10%20分钟%20Quick%20Start.md)：先看懂全貌，再决定从哪里动手
 - [从这里开始](00-首页/从这里开始.md)：前置知识、环境准备、第一条运行轨迹和排错
 - [知识库首页](00-首页/AI%20Agent%20学习知识库.md)：完整导航
 - [贯穿案例：重复扣款工单](00-首页/贯穿案例：重复扣款工单.md)
 - [8 周学习路线](00-首页/学习路线.md)
 - [知识地图](00-首页/知识地图.md)
 - [项目实战总览](05-项目实战/项目总览.md)
+- [LLM Wiki：把资料整理成可维护的知识](02-核心机制/10-LLM%20Wiki.md)：与 RAG、Memory 的关系及无向量入门练习
 - [Agent 术语表](07-术语与资源/Agent%20术语表.md)
 - [常见困惑与排错](07-术语与资源/常见困惑与排错.md)
 - [TypeScript 与 Java 实现对照](03-工程实践/TypeScript%20与%20Java%20实现对照.md)
@@ -33,15 +35,15 @@ npm --prefix labs/01-agent-runtime/typescript run evaluate
 ```text
 00-首页/           导航、路线与知识地图
 01-基础/           LLM、Prompt、模型 API、Embedding
-02-核心机制/       Tool Calling、RAG、Memory、Agent Loop、Planning、Multi-Agent
+02-核心机制/       Tool Calling、RAG、Memory、LLM Wiki、Agent Loop、Planning、Multi-Agent
 03-工程实践/       架构、上下文、工具、状态、幂等、审批、身份授权、异步任务、模型网关
 04-框架与生态/     Spring AI、LangGraph、MCP、多模态与 Computer Use
 05-项目实战/       Chatbot、Mini Agent CLI、RAG 助手、客服工单 Agent
 06-评测安全生产/   评测、指标手算、安全、Prompt Injection、可观测性、成本性能
 07-术语与资源/     术语、常见困惑与排错、问题清单、官方资料与论文
 08-学习记录/       学习看板与日记
-99-模板/           概念、实验和每日学习模板
-labs/              TypeScript 离线实验（无第三方运行时依赖），另保留 Python 对照
+99-模板/           概念、实验、LLM Wiki 页面和每日学习模板
+labs/              TypeScript 离线实验（另保留 Python 对照）、LLM Wiki 文件练习
 scripts/           文档维护用的链接、标题和代码围栏检查及测试
 .github/workflows/  文档与实验的自动校验
 ```
@@ -53,12 +55,14 @@ scripts/           文档维护用的链接、标题和代码围栏检查及测�
 3. 将失败样本沉淀到评测集，不只记录成功案例。
 4. 使用 Obsidian 打开仓库，以获得双向链接、知识图谱和模板体验。
 
+第 5 周学完 RAG 与 Memory 后，可做 [LLM Wiki 最小练习](labs/02-llm-wiki/README.md)：用 Markdown、目录和关键词搜索整理知识，并检查引用、版本冲突与失效内容。它是项目 3 的可选扩展，不要求向量数据库或 Embedding 模型；检索 Wiki 页面再回答仍可属于 RAG。
+
 ## 这套教程怎样帮助理解
 
 - 用同一条“疑似重复扣款”工单串联概念，而不是每章重新换业务。
 - 难点配类比、输入输出、失败分支和可折叠的简短示例答案。
 - 四个渐进项目共用明确的数据契约，并标注样本量、验收分母和安全边界。
-- 讲义代码块标明伪代码或协议示意；`labs/` 才是仓库内可直接运行的实现。框架章节需读者按锁定版本接入，仓库不包含四个项目的完整生产实现。
+- 讲义代码块标明伪代码或协议示意；`labs/01-agent-runtime/` 提供可运行实验，`labs/02-llm-wiki/` 提供需自行使用模型完成的文件练习。框架章节需读者按锁定版本接入，仓库不包含四个项目的完整生产实现。
 
 ## 本地验证
 
